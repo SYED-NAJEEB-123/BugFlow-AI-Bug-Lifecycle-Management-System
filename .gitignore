@@ -1,0 +1,44 @@
+# Environment variables and API keys
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Python virtual environments
+venv/
+env/
+.venv/
+
+# Node modules
+node_modules/
+
+# Build folders
+dist/
+build/
+
+# React / Vite cache
+.vite/
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database files - uncomment if your database is local and should not be uploaded
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded temporary files
+uploads/

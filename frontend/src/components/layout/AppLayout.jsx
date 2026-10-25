@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
+import { BugFlowChatbot } from '../ai/BugFlowChatbot';
 
 export const AppLayout = () => {
   return (
@@ -18,6 +19,9 @@ export const AppLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Persistent Conversational Assistant Widget */}
+      <BugFlowChatbot />
     </div>
   );
 };

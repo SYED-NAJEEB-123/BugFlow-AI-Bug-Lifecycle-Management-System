@@ -13,6 +13,28 @@ sprints_bp = Blueprint('sprints', __name__, url_prefix='/api/sprints')
 @sprints_bp.route('', methods=['GET'])
 @jwt_required()
 def get_sprints():
+    """
+    Get Sprints List
+    ---
+    tags:
+      - Sprints
+    summary: List all sprints with optional project_id and status filtering
+    security:
+      - Bearer: []
+    parameters:
+      - name: project_id
+        in: query
+        type: integer
+      - name: status
+        in: query
+        type: string
+        enum: [Planned, Active, Completed]
+    responses:
+      200:
+        description: List of sprint objects
+      401:
+        description: Unauthorized token
+    """
     project_id = request.args.get('project_id', type=int)
     status_filter = request.args.get('status', '').strip()
 
@@ -32,6 +54,27 @@ def get_sprints():
 @sprints_bp.route('/<int:sprint_id>', methods=['GET'])
 @jwt_required()
 def get_sprint(sprint_id):
+    """
+    Get Sprint Details & Burndown Chart
+    ---
+    tags:
+      - Sprints
+    summary: Retrieve sprint details, assigned defects, and dynamic burndown data points
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Sprint details with burndown points
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
         return jsonify({'error': 'Sprint not found'}), 404
@@ -50,7 +93,6 @@ def get_sprint(sprint_id):
         
         for day_idx in range(total_days + 1):
             curr_date = start_dt.date()
-            # Calculate how many defects were completed by this date
             done_by_date = sum(1 for i in completed_issues if i.updated_at.date() <= curr_date) if hasattr(start_dt, 'date') else len(completed_issues)
             remaining = max(total_defects - done_by_date, 0)
             target = max(round(total_defects * (1 - (day_idx / total_days)), 1), 0)
@@ -68,6 +110,59 @@ def get_sprint(sprint_id):
 @sprints_bp.route('', methods=['POST'])
 @jwt_required()
 def create_sprint():
+    """
+    Create New Sprint
+    ---
+    tags:
+      - Sprints
+    summary: Create a new sprint in a project workspace
+    security:
+      - Bearer: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - project_id
+            - name
+            - start_date
+            - end_date
+          properties:
+            project_id:
+              type: integer
+            name:
+              type: string
+              example: Sprint 1 - Core Auth & UI
+            goal:
+              type: string
+              example: Implement baseline authentication and Kanban features
+            start_date:
+              type: string
+              example: "2026-09-01"
+            end_date:
+              type: string
+              example: "2026-09-14"
+            status:
+              type: string
+              enum: [Planned, Active, Completed]
+            issue_ids:
+              type: array
+              items:
+                type: integer
+    responses:
+      201:
+        description: Sprint created successfully
+      400:
+        description: Missing required fields or date validation error
+      401:
+        description: Unauthorized token
+      403:
+        description: Forbidden (Reporters cannot create sprints)
+      404:
+        description: Project not found
+    """
     user_id = int(get_jwt_identity())
     current_user = db.session.get(User, user_id)
     if current_user and current_user.role == 'Reporter':
@@ -146,6 +241,46 @@ def create_sprint():
 @sprints_bp.route('/<int:sprint_id>', methods=['PUT'])
 @jwt_required()
 def update_sprint(sprint_id):
+    """
+    Update Sprint Details
+    ---
+    tags:
+      - Sprints
+    summary: Modify sprint name, goal, dates, or status
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            name:
+              type: string
+            goal:
+              type: string
+            start_date:
+              type: string
+            end_date:
+              type: string
+            status:
+              type: string
+              enum: [Planned, Active, Completed]
+    responses:
+      200:
+        description: Sprint updated successfully
+      400:
+        description: Date validation error or existing active sprint
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     user_id = int(get_jwt_identity())
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
@@ -201,6 +336,29 @@ def update_sprint(sprint_id):
 @sprints_bp.route('/<int:sprint_id>/start', methods=['POST'])
 @jwt_required()
 def start_sprint(sprint_id):
+    """
+    Start Sprint
+    ---
+    tags:
+      - Sprints
+    summary: Transition sprint status to Active
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Sprint activated
+      400:
+        description: Project already has an active sprint
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     user_id = int(get_jwt_identity())
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
@@ -231,6 +389,27 @@ def start_sprint(sprint_id):
 @sprints_bp.route('/<int:sprint_id>/complete', methods=['POST'])
 @jwt_required()
 def complete_sprint(sprint_id):
+    """
+    Complete Sprint
+    ---
+    tags:
+      - Sprints
+    summary: Transition sprint status to Completed
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Sprint completed
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     user_id = int(get_jwt_identity())
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
@@ -257,6 +436,41 @@ def complete_sprint(sprint_id):
 @sprints_bp.route('/<int:sprint_id>/defects', methods=['POST'])
 @jwt_required()
 def assign_defects(sprint_id):
+    """
+    Assign Defects to Sprint
+    ---
+    tags:
+      - Sprints
+    summary: Add list of defects to target sprint
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - issue_ids
+          properties:
+            issue_ids:
+              type: array
+              items:
+                type: integer
+    responses:
+      200:
+        description: Defects assigned to sprint
+      400:
+        description: Invalid issue_ids list
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     user_id = int(get_jwt_identity())
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
@@ -281,6 +495,31 @@ def assign_defects(sprint_id):
 @sprints_bp.route('/<int:sprint_id>/defects/<int:issue_id>', methods=['DELETE'])
 @jwt_required()
 def remove_defect(sprint_id, issue_id):
+    """
+    Remove Defect from Sprint Backlog
+    ---
+    tags:
+      - Sprints
+    summary: Move defect from sprint back to product backlog
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+      - name: issue_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Defect removed from sprint
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint or defect not found
+    """
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
         return jsonify({'error': 'Sprint not found'}), 404
@@ -300,12 +539,32 @@ def remove_defect(sprint_id, issue_id):
 @sprints_bp.route('/<int:sprint_id>', methods=['DELETE'])
 @jwt_required()
 def delete_sprint(sprint_id):
+    """
+    Delete Sprint
+    ---
+    tags:
+      - Sprints
+    summary: Remove sprint record and return defects to backlog
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Sprint deleted successfully
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     user_id = int(get_jwt_identity())
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
         return jsonify({'error': 'Sprint not found'}), 404
 
-    # Unassign defects back to backlog
     for i in sprint.issues:
         i.sprint_id = None
 
@@ -328,6 +587,27 @@ def delete_sprint(sprint_id):
 @sprints_bp.route('/<int:sprint_id>/ai-advisor', methods=['POST'])
 @jwt_required()
 def get_ai_advisor(sprint_id):
+    """
+    AI Sprint Execution Risk Advisor
+    ---
+    tags:
+      - Sprints
+    summary: Analyze sprint execution velocity, risk alerts, and backlog bottlenecks
+    security:
+      - Bearer: []
+    parameters:
+      - name: sprint_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: AI sprint advisor recommendations
+      401:
+        description: Unauthorized token
+      404:
+        description: Sprint not found
+    """
     sprint = db.session.get(Sprint, sprint_id)
     if not sprint:
         return jsonify({'error': 'Sprint not found'}), 404

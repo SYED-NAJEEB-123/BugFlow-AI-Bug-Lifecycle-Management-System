@@ -16,23 +16,28 @@ export const VisionAnalyzerModal = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
 
+  const [error, setError] = useState(null);
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
       setImagePreviewUrl(URL.createObjectURL(file));
       setAnalysisResult(null);
+      setError(null);
     }
   };
 
   const handleAnalyze = async () => {
     if (!selectedFile) return;
     setIsAnalyzing(true);
+    setError(null);
     try {
       const result = await aiService.analyzeScreenshot(selectedFile);
       setAnalysisResult(result);
     } catch (err) {
       console.error('Vision OCR Analysis error:', err);
+      setError(err.response?.data?.error || 'Failed to analyze screenshot. Please verify image format and backend status.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -78,6 +83,13 @@ export const VisionAnalyzerModal = ({
             {imagePreviewUrl && (
               <div className="rounded-xl overflow-hidden max-h-48 border border-slate-800 flex justify-center bg-slate-950">
                 <img src={imagePreviewUrl} alt="Bug Preview" className="object-contain h-48" />
+              </div>
+            )}
+
+            {error && (
+              <div className="p-3 bg-red-950/50 border border-red-800/50 rounded-xl text-xs text-red-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                {error}
               </div>
             )}
 

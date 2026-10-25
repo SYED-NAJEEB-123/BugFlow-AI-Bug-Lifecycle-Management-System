@@ -16,6 +16,8 @@ import { SprintsPage } from '../pages/sprints/SprintsPage';
 import { SprintDetailPage } from '../pages/sprints/SprintDetailPage';
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
+import { KnowledgeBasePage } from '../pages/knowledge/KnowledgeBasePage';
+import { DeveloperIntelligencePage } from '../pages/intelligence/DeveloperIntelligencePage';
 
 export const AppRoutes = () => {
   return (
@@ -36,6 +38,7 @@ export const AppRoutes = () => {
         }
       >
         <Route path="/dashboard" element={<DashboardContainer />} />
+        <Route path="/developer-intelligence" element={<DeveloperIntelligencePage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/projects" element={<ProjectListPage />} />
@@ -48,6 +51,8 @@ export const AppRoutes = () => {
         <Route path="/report-issue" element={<IssueListPage autoOpenReportModal={true} />} />
         <Route path="/issues/:id" element={<IssueDetailPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+        <Route path="/knowledge" element={<KnowledgeBasePage />} />
 
         {/* Role Specific Shortcuts */}
         <Route

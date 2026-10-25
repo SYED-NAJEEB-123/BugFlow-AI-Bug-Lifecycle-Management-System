@@ -69,3 +69,64 @@ class ActivityLog(db.Model):
             'details': self.details,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+class DeveloperSkill(db.Model):
+    __tablename__ = 'developer_skills'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    primary_languages = db.Column(db.String(255), nullable=True, default='')
+    frameworks = db.Column(db.String(255), nullable=True, default='')
+    preferred_categories = db.Column(db.String(255), nullable=True, default='')
+    preferred_modules = db.Column(db.String(255), nullable=True, default='')
+    experience_rating = db.Column(db.Integer, default=3)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('developer_skill', uselist=False, lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'primary_languages': [l.strip() for l in self.primary_languages.split(',')] if self.primary_languages else [],
+            'frameworks': [f.strip() for f in self.frameworks.split(',')] if self.frameworks else [],
+            'preferred_categories': [c.strip() for c in self.preferred_categories.split(',')] if self.preferred_categories else [],
+            'preferred_modules': [m.strip() for m in self.preferred_modules.split(',')] if self.preferred_modules else [],
+            'experience_rating': self.experience_rating,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class AgentDecision(db.Model):
+    __tablename__ = 'agent_decisions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    issue_id = db.Column(db.Integer, db.ForeignKey('issues.id', ondelete='CASCADE'), nullable=True)
+    action_type = db.Column(db.String(50), nullable=False)
+    confidence_score = db.Column(db.Integer, default=0)
+    extracted_info_json = db.Column(db.Text, nullable=True)
+    duplicate_check_json = db.Column(db.Text, nullable=True)
+    selected_developer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    assignment_score = db.Column(db.Integer, default=0)
+    reasoning = db.Column(db.Text, nullable=True)
+    is_override = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    selected_developer = db.relationship('User', foreign_keys=[selected_developer_id])
+
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'issue_id': self.issue_id,
+            'action_type': self.action_type,
+            'confidence_score': self.confidence_score,
+            'extracted_info': json.loads(self.extracted_info_json) if self.extracted_info_json else {},
+            'duplicate_check': json.loads(self.duplicate_check_json) if self.duplicate_check_json else {},
+            'selected_developer_id': self.selected_developer_id,
+            'selected_developer': self.selected_developer.to_dict() if self.selected_developer else None,
+            'assignment_score': self.assignment_score,
+            'reasoning': self.reasoning,
+            'is_override': self.is_override,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+

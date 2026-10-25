@@ -10,10 +10,11 @@ import { Button } from '../../components/common/Button';
 import { Spinner } from '../../components/common/Spinner';
 import { ResolutionAssistancePanel } from '../../components/ai/ResolutionAssistancePanel';
 import { SimilarDefectsWidget } from '../../components/ai/SimilarDefectsWidget';
+import { AISummaryModal } from '../../components/ai/AISummaryModal';
 import { 
   Bug, ArrowLeft, CheckCircle2, Clock, Users, Send, 
   Paperclip, History, Sparkles, AlertCircle, Edit3, Trash2,
-  FileCode, Check, RefreshCcw, Shield
+  FileCode, Check, RefreshCcw, Shield, FileText
 } from 'lucide-react';
 
 export const IssueDetailPage = () => {
@@ -26,6 +27,7 @@ export const IssueDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'comments' | 'attachments' | 'history'
 
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
 
@@ -234,11 +236,23 @@ export const IssueDetailPage = () => {
             {activeTab === 'overview' && (
               <div className="space-y-4 text-xs">
                 <div>
-                  <h4 className="font-bold text-slate-300 uppercase tracking-wider mb-1">Description</h4>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <h4 className="font-bold text-slate-300 uppercase tracking-wider">Description</h4>
+                    <Button variant="outline" size="sm" icon={Sparkles} onClick={() => setIsSummaryModalOpen(true)}>
+                      Generate AI Summary
+                    </Button>
+                  </div>
                   <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-200 leading-relaxed whitespace-pre-wrap">
                     {issue.description}
                   </div>
                 </div>
+
+                <AISummaryModal
+                  isOpen={isSummaryModalOpen}
+                  onClose={() => setIsSummaryModalOpen(false)}
+                  title={issue.title}
+                  description={issue.description}
+                />
 
                 {issue.steps_to_reproduce && (
                   <div>

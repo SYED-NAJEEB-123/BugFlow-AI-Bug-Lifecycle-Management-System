@@ -12,9 +12,10 @@ import { Spinner } from '../../components/common/Spinner';
 import { IssueModal } from '../../components/issues/IssueModal';
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal';
 import { VisionAnalyzerModal } from '../../components/ai/VisionAnalyzerModal';
+import { AIAgentIntakeModal } from '../../components/ai/AIAgentIntakeModal';
 import { 
   Bug, Plus, Search, Filter, Sparkles, Camera, LayoutGrid, 
-  List, Trash2, Edit3, ExternalLink, Rocket
+  List, Trash2, Edit3, ExternalLink, Rocket, Cpu
 } from 'lucide-react';
 
 export const IssueListPage = ({ autoOpenReportModal = false }) => {
@@ -42,6 +43,7 @@ export const IssueListPage = ({ autoOpenReportModal = false }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingIssue, setDeletingIssue] = useState(null);
   const [isVisionModalOpen, setIsVisionModalOpen] = useState(false);
+  const [isAgentIntakeOpen, setIsAgentIntakeOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canManage = user?.role === 'Admin' || user?.role === 'Project Manager';
@@ -214,6 +216,9 @@ export const IssueListPage = ({ autoOpenReportModal = false }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" icon={Cpu} onClick={() => setIsAgentIntakeOpen(true)} className="border-indigo-700/60 text-indigo-300 hover:bg-indigo-950/60">
+            AI Agent Intake
+          </Button>
           <Button variant="secondary" icon={Camera} onClick={() => setIsVisionModalOpen(true)}>
             Screenshot Vision OCR
           </Button>
@@ -532,6 +537,13 @@ export const IssueListPage = ({ autoOpenReportModal = false }) => {
         isOpen={isVisionModalOpen}
         onClose={() => setIsVisionModalOpen(false)}
         onAcceptAnalysis={handleSaveIssue}
+      />
+
+      <AIAgentIntakeModal
+        isOpen={isAgentIntakeOpen}
+        onClose={() => setIsAgentIntakeOpen(false)}
+        projects={projects}
+        onDefectCreated={() => fetchIssues()}
       />
     </div>
   );

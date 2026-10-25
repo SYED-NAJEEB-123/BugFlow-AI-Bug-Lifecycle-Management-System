@@ -33,6 +33,32 @@ def generate_unique_key(name):
 @projects_bp.route('', methods=['GET'])
 @jwt_required()
 def get_projects():
+    """
+    Get Projects List
+    ---
+    tags:
+      - Projects
+    summary: Retrieve list of active projects with optional search query and status filter
+    security:
+      - Bearer: []
+    parameters:
+      - name: q
+        in: query
+        type: string
+        required: false
+        description: Search term for project name, key, or description
+      - name: status
+        in: query
+        type: string
+        required: false
+        enum: [Active, Completed, Archived]
+        description: Filter projects by status
+    responses:
+      200:
+        description: List of projects
+      401:
+        description: Unauthorized token
+    """
     search_q = request.args.get('q', '').strip()
     status_filter = request.args.get('status', '').strip()
 
@@ -58,7 +84,29 @@ def get_projects():
 @projects_bp.route('/<int:project_id>', methods=['GET'])
 @jwt_required()
 def get_project(project_id):
-    project = Project.query.get(project_id)
+    """
+    Get Project Details by ID
+    ---
+    tags:
+      - Projects
+    summary: Retrieve detailed info for a specific project
+    security:
+      - Bearer: []
+    parameters:
+      - name: project_id
+        in: path
+        type: integer
+        required: true
+        description: ID of target project
+    responses:
+      200:
+        description: Project detail object
+      401:
+        description: Unauthorized token
+      404:
+        description: Project not found
+    """
+    project = db.session.get(Project, project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
         
@@ -68,6 +116,56 @@ def get_project(project_id):
 @jwt_required()
 @role_required(['Admin', 'Project Manager'])
 def create_project():
+    """
+    Create New Project (Admin / Project Manager)
+    ---
+    tags:
+      - Projects
+    summary: Create a new software project workspace
+    security:
+      - Bearer: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              example: BugFlow Core Platform
+            key:
+              type: string
+              example: BUG
+            description:
+              type: string
+              example: Main software defect tracking repository
+            status:
+              type: string
+              enum: [Active, Completed, Archived]
+              example: Active
+            target_end_date:
+              type: string
+              example: "2026-12-31"
+            member_ids:
+              type: array
+              items:
+                type: integer
+              example: [1, 2, 3]
+    responses:
+      201:
+        description: Project created successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized token
+      403:
+        description: Forbidden (Admin / PM role required)
+      409:
+        description: Project key conflict
+    """
     data = request.get_json() or {}
     user_id = int(get_jwt_identity())
 
@@ -110,7 +208,7 @@ def create_project():
 
     # Add other selected member IDs
     for m_id in member_ids:
-        if m_id != user_id and User.query.get(m_id):
+        if m_id != user_id and db.session.get(User, m_id):
             pm = ProjectMember(project_id=project.id, user_id=m_id, role_in_project='Member')
             db.session.add(pm)
 
@@ -135,7 +233,51 @@ def create_project():
 @jwt_required()
 @role_required(['Admin', 'Project Manager'])
 def update_project(project_id):
-    project = Project.query.get(project_id)
+    """
+    Update Project Details (Admin / Project Manager)
+    ---
+    tags:
+      - Projects
+    summary: Modify project name, description, status, or member list
+    security:
+      - Bearer: []
+    parameters:
+      - name: project_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            status:
+              type: string
+              enum: [Active, Completed, Archived]
+            progress_percentage:
+              type: number
+            target_end_date:
+              type: string
+            member_ids:
+              type: array
+              items:
+                type: integer
+    responses:
+      200:
+        description: Project updated successfully
+      401:
+        description: Unauthorized token
+      403:
+        description: Forbidden (Admin / PM role required)
+      404:
+        description: Project not found
+    """
+    project = db.session.get(Project, project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -166,7 +308,7 @@ def update_project(project_id):
         # Update members
         ProjectMember.query.filter_by(project_id=project.id).delete()
         for m_id in data['member_ids']:
-            if User.query.get(m_id):
+            if db.session.get(User, m_id):
                 pm = ProjectMember(
                     project_id=project.id,
                     user_id=m_id,
@@ -195,7 +337,30 @@ def update_project(project_id):
 @jwt_required()
 @role_required(['Admin', 'Project Manager'])
 def delete_project(project_id):
-    project = Project.query.get(project_id)
+    """
+    Delete Project (Admin / Project Manager)
+    ---
+    tags:
+      - Projects
+    summary: Remove project workspace and associated defects
+    security:
+      - Bearer: []
+    parameters:
+      - name: project_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Project deleted successfully
+      401:
+        description: Unauthorized token
+      403:
+        description: Forbidden (Admin / PM role required)
+      404:
+        description: Project not found
+    """
+    project = db.session.get(Project, project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -222,7 +387,43 @@ def delete_project(project_id):
 @jwt_required()
 @role_required(['Admin', 'Project Manager'])
 def add_project_member(project_id):
-    project = Project.query.get(project_id)
+    """
+    Add Project Member
+    ---
+    tags:
+      - Projects
+    summary: Assign user to a project workspace
+    security:
+      - Bearer: []
+    parameters:
+      - name: project_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - user_id
+          properties:
+            user_id:
+              type: integer
+            role_in_project:
+              type: string
+              example: Member
+    responses:
+      200:
+        description: Member added successfully
+      400:
+        description: Invalid user_id
+      401:
+        description: Unauthorized token
+      404:
+        description: Project not found
+    """
+    project = db.session.get(Project, project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -230,7 +431,7 @@ def add_project_member(project_id):
     user_id_to_add = data.get('user_id')
     role_in_project = data.get('role_in_project', 'Member')
 
-    if not user_id_to_add or not User.query.get(user_id_to_add):
+    if not user_id_to_add or not db.session.get(User, user_id_to_add):
         return jsonify({'error': 'Valid user_id is required'}), 400
 
     existing = ProjectMember.query.filter_by(project_id=project_id, user_id=user_id_to_add).first()
@@ -247,6 +448,31 @@ def add_project_member(project_id):
 @jwt_required()
 @role_required(['Admin', 'Project Manager'])
 def remove_project_member(project_id, user_id_to_remove):
+    """
+    Remove Project Member
+    ---
+    tags:
+      - Projects
+    summary: Unassign user from project workspace
+    security:
+      - Bearer: []
+    parameters:
+      - name: project_id
+        in: path
+        type: integer
+        required: true
+      - name: user_id_to_remove
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Member removed from project
+      401:
+        description: Unauthorized token
+      404:
+        description: Project member not found
+    """
     member = ProjectMember.query.filter_by(project_id=project_id, user_id=user_id_to_remove).first()
     if not member:
         return jsonify({'error': 'Project member not found'}), 404

@@ -176,43 +176,129 @@ Return strictly a valid JSON object:
         return AIService._fallback_vision_analysis()
 
     @staticmethod
-    def generate_resolution_assistance(defect_data, historical_fixes=None):
-        """Signature Feature: Developer Resolution Co-Pilot."""
+    def analyze_screenshot_vision(file_input, mime_type=None):
+        """Accepts either Werkzeug FileStorage or raw bytes, reads image, validates, and runs vision analysis."""
+        try:
+            if hasattr(file_input, 'read'):
+                file_input.seek(0)
+                image_bytes = file_input.read()
+                file_input.seek(0)
+                detected_mime = getattr(file_input, 'content_type', None) or getattr(file_input, 'mimetype', None) or 'image/png'
+                if not mime_type:
+                    mime_type = detected_mime
+            else:
+                image_bytes = file_input
+                if not mime_type:
+                    mime_type = 'image/png'
+
+            return AIService.analyze_screenshot(image_bytes, mime_type=mime_type)
+        except Exception as e:
+            print(f"Error in analyze_screenshot_vision: {e}")
+            return AIService._fallback_vision_analysis()
+
+    @staticmethod
+    def summarize_defect(description, title=""):
+        """Convert long defect description into concise professional executive summary."""
         client = get_gemini_client()
         if not client:
-            return AIService._fallback_resolution_assistance(defect_data)
+            return {
+                "short_summary": description[:150] + "..." if len(description) > 150 else description,
+                "important_symptoms": ["System error or unexpected behavior reported"],
+                "impact": "Requires technical review by engineering team",
+                "context": f"Defect Title: {title or 'Unspecified'}"
+            }
 
         prompt = f"""
-You are a Principal Software Architect aiding a Developer in resolving a software defect.
+You are a Lead QA Architect. Summarize the following defect report into a concise technical summary.
 
-Defect Details:
-- Key: {defect_data.get('issue_key')}
-- Title: "{defect_data.get('title')}"
-- Description: "{defect_data.get('description')}"
-- Category: {defect_data.get('category')}
-- Module: {defect_data.get('module')}
-- Severity: {defect_data.get('severity')}
-- Environment: {defect_data.get('environment')}
+Defect Title: "{title}"
+Defect Description: "{description}"
 
-Historical Fixes Available:
-{json.dumps(historical_fixes or [])}
+Return strictly a valid JSON object:
+{{
+  "short_summary": "Concise 1-2 sentence summary of defect",
+  "important_symptoms": ["Symptom 1", "Symptom 2"],
+  "impact": "Business/system impact of defect",
+  "context": "Key technical context (e.g. affected API, UI component, database)"
+}}
+"""
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            result = clean_json_response(response.text)
+            if result.get('short_summary'):
+                return result
+        except Exception as e:
+            print(f"Gemini summarize_defect failed: {e}")
 
-Provide intelligent resolution assistance.
+        return {
+            "short_summary": description[:150] + "..." if len(description) > 150 else description,
+            "important_symptoms": ["System error or unexpected behavior reported"],
+            "impact": "Requires technical review by engineering team",
+            "context": f"Defect Title: {title or 'Unspecified'}"
+        }
+
+    @staticmethod
+    def generate_resolution_assistance(defect_data, historical_fixes=None, rag_context=None):
+        """Signature Feature: RAG-Grounded Developer Resolution Co-Pilot."""
+        client = get_gemini_client()
+        
+        has_rag_evidence = bool(rag_context and rag_context.get('has_sufficient_evidence'))
+        evidence_summary = rag_context.get('evidence_summary', 'No historical matches retrieved.') if rag_context else 'No historical matches retrieved.'
+        retrieved_defects = rag_context.get('retrieved_defects', []) if rag_context else []
+        retrieved_resolutions = rag_context.get('historical_resolutions', []) if rag_context else []
+
+        if not client:
+            res = AIService._fallback_resolution_assistance(defect_data)
+            res['confidence_indicator'] = "Moderate Evidence" if (historical_fixes or has_rag_evidence) else "Insufficient Evidence"
+            res['evidence_summary'] = evidence_summary
+            res['retrieved_defects'] = retrieved_defects
+            return res
+
+        prompt = f"""
+You are a Principal Software Architect aiding a Developer in investigating and resolving a software defect.
+
+Current Defect Details:
+- Key: {defect_data.get('issue_key', 'N/A')}
+- Title: "{defect_data.get('title', '')}"
+- Description: "{defect_data.get('description', '')}"
+- Category: {defect_data.get('category', 'General')}
+- Module: {defect_data.get('module', 'General')}
+- Severity: {defect_data.get('severity', 'Medium')}
+- Environment: {defect_data.get('environment', 'Development')}
+
+Grounded RAG Historical Context (Retrieved Database Evidence):
+- Has Evidence: {has_rag_evidence}
+- Evidence Summary: {evidence_summary}
+- Retrieved Similar Resolved Defects: {json.dumps(retrieved_resolutions)}
+- Additional Historical Fixes: {json.dumps(historical_fixes or [])}
+
+Instructions:
+1. Base your recommendations strictly on the provided defect details and retrieved historical evidence.
+2. If evidence is sufficient, reference specific historical defects (e.g. DEF-102) as supporting evidence.
+3. If evidence is insufficient, state "Insufficient historical information available for a reliable recommendation" clearly.
+4. Use phrases like "Possible Resolution", "Suggested Area for Investigation", and "Potential Cause". Do NOT claim the AI automatically fixed the defect.
+
 Return strictly a valid JSON object:
 {{
   "investigation_areas": [
-    "1. Specific file, API route, or database table to inspect",
-    "2. Specific log entry or stack trace pattern to check",
-    "3. Specific state variable or token handling code"
+    "1. Suggested Area for Investigation: Specific file, route, or table to inspect",
+    "2. Suggested Area for Investigation: Specific log entry or trace to verify"
   ],
-  "possible_root_cause": "Primary technical hypothesis for this defect",
-  "suggested_resolution": "Step-by-step code resolution instructions",
+  "possible_root_cause": "Potential Cause: Primary technical hypothesis based on available details",
+  "suggested_resolution": "Possible Resolution: Step-by-step code resolution instructions",
   "suggested_testing_steps": [
-    "1. Unit test check",
-    "2. Integration API payload check",
-    "3. Verification step"
+    "1. Run backend unit/integration tests for affected module",
+    "2. Verify UI state fallback"
   ],
-  "disclaimer": "Our AI provides intelligent assistance to help developers analyze defects and identify possible resolution approaches."
+  "confidence_indicator": "High Evidence / Moderate Evidence / Insufficient Evidence",
+  "evidence_summary": "{evidence_summary}",
+  "disclaimer": "Our AI provides intelligent assistance to help developers analyze defects and identify possible resolution approaches. The developer remains responsible for reviewing and applying the final solution."
 }}
 """
         try:
@@ -225,11 +311,17 @@ Return strictly a valid JSON object:
             )
             result = clean_json_response(response.text)
             if result.get('possible_root_cause'):
+                result['retrieved_defects'] = retrieved_defects
                 return result
         except Exception as e:
             print(f"Gemini generate_resolution_assistance failed: {e}")
 
-        return AIService._fallback_resolution_assistance(defect_data)
+        res = AIService._fallback_resolution_assistance(defect_data)
+        res['confidence_indicator'] = "Moderate Evidence" if (historical_fixes or has_rag_evidence) else "Insufficient Evidence"
+        res['evidence_summary'] = evidence_summary
+        res['retrieved_defects'] = retrieved_defects
+        return res
+
 
     # --- Fallback Generators when API Key is not set or offline ---
 

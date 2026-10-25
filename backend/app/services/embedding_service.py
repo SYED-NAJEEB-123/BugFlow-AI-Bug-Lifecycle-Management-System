@@ -106,7 +106,7 @@ class EmbeddingService:
         return text_to_vector(text)
 
     @staticmethod
-    def rank_similar_defects(query_text, candidate_issues, exclude_issue_id=None):
+    def rank_similar_defects(query_text, candidate_issues, exclude_issue_id=None, top_k=5):
         """Rank candidate issues by semantic vector similarity to query_text."""
         if not query_text or not candidate_issues:
             return []
@@ -140,7 +140,7 @@ class EmbeddingService:
                 results.append(issue_dict)
 
         results.sort(key=lambda x: x['similarity_score'], reverse=True)
-        return results
+        return results[:top_k] if top_k else results
 
     @staticmethod
     def check_duplicates(payload, candidate_issues, threshold=None):
@@ -150,3 +150,82 @@ class EmbeddingService:
         query_text = generate_defect_text(payload)
         ranked = EmbeddingService.rank_similar_defects(query_text, candidate_issues)
         return [r for r in ranked if r['similarity_score'] >= threshold]
+
+    @staticmethod
+    def sync_defect_embedding(issue):
+        """Generate and store/update vector embedding record for a defect in DB."""
+        from app.extensions import db
+        from app.models.issue import DefectEmbedding, Issue
+        if isinstance(issue, int):
+            issue = db.session.get(Issue, issue)
+        if not issue:
+            return None
+
+        text_content = generate_defect_text(issue)
+        vector = EmbeddingService.generate_embedding(text_content)
+
+        embedding_rec = DefectEmbedding.query.filter_by(issue_id=issue.id).first()
+        if not embedding_rec:
+            embedding_rec = DefectEmbedding(
+                issue_id=issue.id,
+                embedding_json=json.dumps(vector),
+                text_content=text_content
+            )
+            db.session.add(embedding_rec)
+        else:
+            embedding_rec.embedding_json = json.dumps(vector)
+            embedding_rec.text_content = text_content
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Failed to sync defect embedding: {e}")
+
+        return embedding_rec
+
+    @staticmethod
+    def retrieve_rag_context(query_text, candidate_issues, exclude_issue_id=None, top_k=5, threshold=15):
+        """Retrieve grounded RAG context including similar defects, resolved historical fixes, and developer comments."""
+        if not query_text or not candidate_issues:
+            return {
+                'retrieved_defects': [],
+                'historical_resolutions': [],
+                'has_sufficient_evidence': False,
+                'evidence_summary': 'Insufficient historical information available for a reliable recommendation.'
+            }
+
+        ranked = EmbeddingService.rank_similar_defects(query_text, candidate_issues, exclude_issue_id=exclude_issue_id)
+        filtered = [r for r in ranked if r['similarity_score'] >= threshold]
+
+        if not filtered:
+            return {
+                'retrieved_defects': [],
+                'historical_resolutions': [],
+                'has_sufficient_evidence': False,
+                'evidence_summary': 'Insufficient historical information available for a reliable recommendation.'
+            }
+
+        # Extract resolved defects for historical knowledge context
+        historical_resolutions = []
+        for item in filtered:
+            if item['status'] in ['Resolved', 'Verified', 'Closed'] or item.get('root_cause') or item.get('suggested_fix'):
+                historical_resolutions.append({
+                    'issue_id': item['id'],
+                    'issue_key': item['issue_key'],
+                    'title': item['title'],
+                    'category': item['category'],
+                    'severity': item['severity'],
+                    'root_cause': item['root_cause'] or 'N/A',
+                    'suggested_fix': item['suggested_fix'] or 'N/A',
+                    'similarity_score': item['similarity_score'],
+                    'similarity_level': item['similarity_level']
+                })
+
+        return {
+            'retrieved_defects': filtered[:top_k],
+            'historical_resolutions': historical_resolutions[:top_k],
+            'has_sufficient_evidence': True,
+            'evidence_summary': f"Retrieved {len(filtered[:top_k])} relevant historical defect matches for grounded resolution analysis."
+        }
+

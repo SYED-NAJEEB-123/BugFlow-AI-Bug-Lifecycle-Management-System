@@ -17,6 +17,44 @@ def create_app(config_name=None):
     db.init_app(app)
     jwt.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+
+    # Initialize Swagger API Documentation
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": 'apispec_1',
+                "route": '/apispec_1.json',
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/apidocs/"
+    }
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "BugFlow AI Defect Tracking System API Engine",
+            "description": "Complete REST API Specifications for BugFlow AI Defect Management System",
+            "version": "1.0.0"
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+            }
+        }
+    }
+    try:
+        from flasgger import Swagger
+        Swagger(app, config=swagger_config, template=swagger_template)
+    except Exception as e:
+        app.logger.warning(f"Flasgger Swagger init notice: {e}")
+
     
     # JWT Custom Handlers
     @jwt.invalid_token_loader
@@ -67,7 +105,7 @@ def create_app(config_name=None):
 
     # Explicitly import all models inside app_context and create tables
     with app.app_context():
-        from app.models.user import User, ActivityLog
+        from app.models.user import User, ActivityLog, DeveloperSkill, AgentDecision
         from app.models.project import Project, ProjectMember
         from app.models.sprint import Sprint
         from app.models.issue import (

@@ -10,6 +10,57 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
+    """
+    User Registration
+    ---
+    tags:
+      - Auth
+    summary: Register a new account with a specified role
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - username
+            - password
+            - full_name
+          properties:
+            email:
+              type: string
+              example: dev@bugflow.com
+            username:
+              type: string
+              example: devuser
+            password:
+              type: string
+              example: password123
+            full_name:
+              type: string
+              example: John Developer
+            role:
+              type: string
+              enum: [Admin, Developer, Tester, Project Manager, Reporter]
+              example: Developer
+            department:
+              type: string
+              example: Engineering
+            phone:
+              type: string
+              example: "+1234567890"
+            skills:
+              type: string
+              example: "React, Python, SQL"
+    responses:
+      201:
+        description: User registered successfully
+      400:
+        description: Validation error or missing fields
+      409:
+        description: Email or username conflict
+    """
     data = request.get_json() or {}
     
     email = data.get('email', '').strip().lower()
@@ -80,6 +131,38 @@ def register():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
+    """
+    User Login
+    ---
+    tags:
+      - Auth
+    summary: Authenticate user and obtain JWT access token
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email_or_username
+            - password
+          properties:
+            email_or_username:
+              type: string
+              example: devuser
+            password:
+              type: string
+              example: password123
+    responses:
+      200:
+        description: Login successful with JWT tokens
+      400:
+        description: Missing email/username or password
+      401:
+        description: Invalid credentials
+      403:
+        description: User account deactivated
+    """
     data = request.get_json() or {}
     
     identifier = data.get('email_or_username', '').strip().lower()
@@ -129,6 +212,22 @@ def login():
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
+    """
+    Get Current Authenticated User Profile
+    ---
+    tags:
+      - Auth
+    summary: Fetch identity and role of currently logged-in user
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: Current user profile object
+      401:
+        description: Unauthorized or token missing
+      404:
+        description: User not found
+    """
     user_id = get_jwt_identity()
     user = db.session.get(User, int(user_id))
     
@@ -140,6 +239,42 @@ def get_current_user():
 @auth_bp.route('/profile', methods=['PUT'])
 @jwt_required()
 def update_profile():
+    """
+    Update User Profile
+    ---
+    tags:
+      - Users
+    summary: Update profile details for current logged-in user
+    security:
+      - Bearer: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            full_name:
+              type: string
+            department:
+              type: string
+            phone:
+              type: string
+            skills:
+              type: string
+            theme_preference:
+              type: string
+              enum: [default, dark, light, blue, purple, emerald]
+            avatar_url:
+              type: string
+    responses:
+      200:
+        description: Profile updated successfully
+      401:
+        description: Unauthorized token
+      404:
+        description: User not found
+    """
     user_id = get_jwt_identity()
     user = db.session.get(User, int(user_id))
     
@@ -184,6 +319,36 @@ def update_profile():
 @auth_bp.route('/change-password', methods=['POST'])
 @jwt_required()
 def change_password():
+    """
+    Change Account Password
+    ---
+    tags:
+      - Auth
+    summary: Update current account password
+    security:
+      - Bearer: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - current_password
+            - new_password
+          properties:
+            current_password:
+              type: string
+            new_password:
+              type: string
+    responses:
+      200:
+        description: Password changed successfully
+      400:
+        description: Password validation error
+      401:
+        description: Unauthorized token
+    """
     user_id = get_jwt_identity()
     user = db.session.get(User, int(user_id))
     

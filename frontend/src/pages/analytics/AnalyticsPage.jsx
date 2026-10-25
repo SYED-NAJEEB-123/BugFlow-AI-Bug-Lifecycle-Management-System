@@ -4,11 +4,11 @@ import { Card } from '../../components/common/Card';
 import { Spinner } from '../../components/common/Spinner';
 import { 
   BarChart3, PieChart as PieIcon, TrendingUp, Users, 
-  Bug, AlertTriangle, CheckCircle2, Clock, Rocket 
+  Bug, AlertTriangle, CheckCircle2, Clock, Rocket, Activity, Layers
 } from 'lucide-react';
 import { 
   ResponsiveContainer, PieChart, Pie, Cell, 
-  BarChart, Bar, XAxis, YAxis, Tooltip, Legend 
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, AreaChart, Area
 } from 'recharts';
 
 export const AnalyticsPage = () => {
@@ -30,6 +30,7 @@ export const AnalyticsPage = () => {
   }, []);
 
   const SEVERITY_COLORS = ['#f43f5e', '#f59e0b', '#3b82f6', '#94a3b8'];
+  const STATUS_COLORS = ['#ec4899', '#f59e0b', '#6366f1', '#06b6d4', '#10b981', '#14b8a6', '#64748b', '#ef4444'];
 
   if (loading) {
     return (
@@ -41,7 +42,7 @@ export const AnalyticsPage = () => {
 
   if (!data) return null;
 
-  const { overview, severity_breakdown, category_breakdown, developer_workload } = data;
+  const { overview, severity_breakdown, category_breakdown, status_breakdown, developer_workload, defect_trends, open_vs_resolved } = data;
 
   return (
     <div className="space-y-6">
@@ -52,7 +53,7 @@ export const AnalyticsPage = () => {
           <BarChart3 className="w-5 h-5 text-indigo-400" />
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Real-time metrics on defect severity distribution, category breakdown, resolution velocity, sprint completion, and developer workloads
+          Real-time metrics on defect severity distribution, category breakdown, resolution velocity, defect trends, sprint completion, and developer workloads
         </p>
       </div>
 
@@ -98,7 +99,7 @@ export const AnalyticsPage = () => {
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Resolution Rate</p>
             <h3 className="text-2xl font-black text-emerald-400 mt-1">{overview.resolution_rate}%</h3>
             <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
-              <TrendingUp className="w-3 h-3" /> {overview.resolved_defects} Fixed
+              <TrendingUp className="w-3 h-3" /> {overview.resolved_defects + overview.closed_defects} Fixed
             </span>
           </div>
           <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -117,6 +118,40 @@ export const AnalyticsPage = () => {
           </div>
         </Card>
       </div>
+
+      {/* Defect Trends Timeline Chart (Past 7 Days) */}
+      {defect_trends && defect_trends.length > 0 && (
+        <Card className="p-6 space-y-4">
+          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-emerald-400" />
+            <span>Defect Velocity & Creation Trends (Past 7 Days)</span>
+          </h3>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={defect_trends}>
+                <defs>
+                  <linearGradient id="colorCreated" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0}/>
+                  </linearGradient>
+                  <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="#64748b" fontSize={11} />
+                <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0d121f', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                />
+                <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} />
+                <Area type="monotone" dataKey="created" name="Reported Defects" stroke="#f43f5e" fillOpacity={1} fill="url(#colorCreated)" />
+                <Area type="monotone" dataKey="resolved" name="Resolved Defects" stroke="#10b981" fillOpacity={1} fill="url(#colorResolved)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
 
       {/* Visual Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -161,7 +196,7 @@ export const AnalyticsPage = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={category_breakdown}>
                 <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
+                <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#0d121f', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
                 />
@@ -170,6 +205,50 @@ export const AnalyticsPage = () => {
             </ResponsiveContainer>
           </div>
         </Card>
+
+        {/* Status Distribution Bar Chart */}
+        {status_breakdown && (
+          <Card className="p-6 space-y-4">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-amber-400" />
+              <span>Defect Lifecycle Status Breakdown</span>
+            </h3>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={status_breakdown}>
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={10} />
+                  <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0d121f', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="count" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
+        {/* Open vs Resolved Comparison */}
+        {open_vs_resolved && (
+          <Card className="p-6 space-y-4">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Open Backlog vs Resolved Comparison</span>
+            </h3>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={open_vs_resolved}>
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0d121f', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Developer Workload Allocation */}

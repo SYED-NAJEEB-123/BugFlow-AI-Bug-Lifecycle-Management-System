@@ -10,9 +10,11 @@ import { aiService } from '../../services/aiService';
 import { AIEnhancerModal } from '../ai/AIEnhancerModal';
 import { VisionAnalyzerModal } from '../ai/VisionAnalyzerModal';
 import { SimilarDefectsWidget } from '../ai/SimilarDefectsWidget';
+import { DeveloperAllocationPanel } from '../ai/DeveloperAllocationPanel';
+import { ImpactAnalysisPanel } from '../ai/ImpactAnalysisPanel';
 import { 
   Bug, FolderKanban, Sparkles, Camera, Users, 
-  Wrench, Save, Plus, AlertCircle, FileText
+  Wrench, Save, Plus, AlertCircle, FileText, Activity
 } from 'lucide-react';
 
 export const IssueModal = ({
@@ -361,6 +363,21 @@ export const IssueModal = ({
             />
           </div>
 
+          {/* AI Developer Allocation Agent Widget */}
+          <DeveloperAllocationPanel
+            defectData={{
+              title: formData.title,
+              description: formData.description,
+              category: formData.category,
+              module: formData.module,
+              severity: formData.severity,
+              priority: formData.priority,
+              project_id: formData.project_id
+            }}
+            currentAssigneeId={formData.assignee_id}
+            onSelectDeveloper={(devId) => setFormData(prev => ({ ...prev, assignee_id: devId }))}
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 block mb-1">
@@ -388,6 +405,23 @@ export const IssueModal = ({
               />
             </div>
           </div>
+
+          {/* Defect Impact Analysis Panel */}
+          {(formData.title || formData.description) && (
+            <ImpactAnalysisPanel
+              issueId={issue?.id || null}
+              defectData={{
+                title: formData.title,
+                description: formData.description,
+                category: formData.category,
+                module: formData.module,
+                severity: formData.severity,
+                priority: formData.priority,
+                assignee_id: formData.assignee_id,
+                project_id: formData.project_id
+              }}
+            />
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
             <Button variant="outline" onClick={onClose} disabled={isLoading}>

@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
   LayoutDashboard, Bug, FolderKanban, Users, Sparkles, 
-  Camera, BarChart3, Settings, Shield, ChevronRight, FileText, CheckCircle, Rocket, Plus
+  Camera, BarChart3, Settings, Shield, ChevronRight, FileText, CheckCircle, Rocket, Plus, BookOpen, Cpu
 } from 'lucide-react';
 
 export const Sidebar = () => {
@@ -15,10 +15,12 @@ export const Sidebar = () => {
 
     const common = [
       { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+      { name: 'Developer Intelligence', path: '/developer-intelligence', icon: Cpu },
       { name: 'Report Defect', path: '/report', icon: Plus },
       { name: 'Projects', path: '/projects', icon: FolderKanban },
       { name: 'Sprints', path: '/sprints', icon: Rocket },
       { name: 'Defects & Bugs', path: '/issues', icon: Bug },
+      { name: 'Knowledge Base', path: '/knowledge-base', icon: BookOpen },
       { name: 'Analytics', path: '/analytics', icon: BarChart3 },
     ];
 

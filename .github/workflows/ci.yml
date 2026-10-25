@@ -1,4 +1,4 @@
-name: BugFlow CI Pipeline
+name: BugFlow AI Defect Tracking System CI/CD Pipeline
 
 on:
   push:
@@ -7,54 +7,62 @@ on:
     branches: [ main, master ]
 
 jobs:
-  backend-tests:
-    name: Backend Test Suite (Python & Flask)
+  backend-test:
+    name: Backend Pytest Suite & Code Integrity
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install Backend Dependencies
         run: |
-          cd backend
           python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
           pip install pytest pytest-cov
-          pip install -r requirements.txt
 
-      - name: Run Pytest Suite
+      - name: Execute Pytest Suite
         env:
-          SECRET_KEY: test_secret_key
-          JWT_SECRET_KEY: test_jwt_secret_key
           FLASK_ENV: testing
+          SECRET_KEY: test_secret_key_ci
+          JWT_SECRET_KEY: test_jwt_secret_key_ci
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cd backend
-          python -m pytest
+          python -m pytest -v
 
   frontend-build:
-    name: Frontend Build & Validation (React & Vite)
+    name: Frontend Vite Client Build & Lint Verification
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Frontend Dependencies
         run: |
           cd frontend
           npm ci || npm install
 
-      - name: Build Production React Bundle
+      - name: Run Frontend Code Validation & Linting
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Build Frontend Application
         run: |
           cd frontend
           npm run build
